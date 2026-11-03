@@ -1,8 +1,6 @@
 # LendLoop
 
-**Borrow what you need. Lend what you don't.**
-
-A responsive neighborhood tool-sharing board built for the Fluence Full-Stack Developer technical exercise. Visitors can see currently available tool names/categories. Signed-in neighbors can list tools, request loans, approve or decline incoming requests, and confirm returns. Admins can moderate listings, review all loans, and designate trusted lenders. Two n8n workflows handle signed request notifications and daily overdue reminders, backed by a separate failure workflow.
+A responsive neighborhood tool-sharing board.Visitors can see currently available tool names/categories. Signed-in neighbors can list tools, request loans, approve or decline incoming requests, and confirm returns. Admins can moderate listings, review all loans, and designate trusted lenders. Two n8n workflows handle signed request notifications and daily overdue reminders, backed by a separate failure workflow.
 
 **Stack:** Next.js 16 App Router · React 19 · TypeScript · Clerk · Convex · n8n · Docker Compose · Web Crypto HMAC-SHA256.
 
