@@ -1,0 +1,48 @@
+{
+  "name": "LendLoop — Automation error handler",
+  "nodes": [
+    {
+      "id": "error",
+      "name": "On workflow failure",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        240
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "log",
+      "name": "Record sanitized failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const failure = $input.first().json;\nconst info = {\n  workflow: failure.workflow?.name || 'Unknown workflow',\n  executionId: failure.execution?.id || 'unknown',\n  failedNode: failure.execution?.lastNodeExecuted || 'unknown',\n  error: String(failure.execution?.error?.message || failure.trigger?.error?.message || 'Unknown failure').slice(0, 240),\n  observedAt: new Date().toISOString(),\n};\nconsole.error('[LendLoop workflow failure]', JSON.stringify(info));\n// Replace this logger with an incident channel or monitored alert destination in production.\nreturn [{ json: info }];"
+      }
+    }
+  ],
+  "connections": {
+    "On workflow failure": {
+      "main": [
+        [
+          {
+            "node": "Record sanitized failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}

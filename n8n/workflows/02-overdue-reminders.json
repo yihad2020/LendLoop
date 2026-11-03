@@ -1,0 +1,171 @@
+{
+  "name": "LendLoop — Daily overdue reminders",
+  "nodes": [
+    {
+      "id": "schedule",
+      "name": "Every day 09:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        140,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "get",
+      "name": "Fetch overdue loans (authenticated)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        390,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LENDLOOP_CONVEX_SITE_URL + \"/automation/overdue\" }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ \"Bearer \" + $env.LENDLOOP_CALLBACK_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "split",
+      "name": "One item per overdue loan",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      }
+    },
+    {
+      "id": "sign",
+      "name": "Mock reminder & sign write-back",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst loan = $input.first().json;\nconst secret = $env.LENDLOOP_WEBHOOK_SECRET;\nif (!secret) throw new Error('Missing signing secret');\nif (!loan.requestId || !loan.reminderKey) throw new Error('Missing reminder fields');\n// Mock notification. No third-party PII is transmitted.\nconsole.log('[LendLoop mock overdue reminder]', JSON.stringify({to: loan.recipientLabel, tool: loan.toolName, due: loan.dueDate}));\nconst rawBody = JSON.stringify({requestId: loan.requestId, reminderKey: loan.reminderKey});\nconst timestamp = String(Date.now());\nconst signature = crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');\nreturn [{json:{rawBody,timestamp,signature:`sha256=${signature}`,requestId:loan.requestId}}];"
+      }
+    },
+    {
+      "id": "post",
+      "name": "Idempotent Convex reminder write-back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LENDLOOP_CONVEX_SITE_URL + \"/automation/reminders\" }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.rawBody }}",
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Every day 09:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch overdue loans (authenticated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch overdue loans (authenticated)": {
+      "main": [
+        [
+          {
+            "node": "One item per overdue loan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per overdue loan": {
+      "main": [
+        [
+          {
+            "node": "Mock reminder & sign write-back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock reminder & sign write-back": {
+      "main": [
+        [
+          {
+            "node": "Idempotent Convex reminder write-back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}

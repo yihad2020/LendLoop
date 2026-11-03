@@ -1,0 +1,109 @@
+{
+  "name": "LendLoop — Signed request notifications",
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Signed Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        280
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        },
+        "webhookId": "lendloop-events"
+      },
+      "webhookId": "lendloop-events"
+    },
+    {
+      "id": "verify",
+      "name": "Verify timestamp & HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $input.first().json;\nconst headers = Object.fromEntries(Object.entries(input.headers || {}).map(([key, value]) => [key.toLowerCase(), value]));\nconst timestamp = String(headers['x-lendloop-timestamp'] || '');\nconst signature = String(headers['x-lendloop-signature'] || '').replace(/^sha256=/, '');\nconst secret = $env.LENDLOOP_WEBHOOK_SECRET;\nif (!secret || !/^\\d{13}$/.test(timestamp) || Math.abs(Date.now() - Number(timestamp)) > 300000) {\n  throw new Error('Webhook authentication failed: stale or missing timestamp');\n}\nconst raw = typeof input.body === 'string' ? input.body : JSON.stringify(input.body);\nif (!raw || !/^[a-f0-9]{64}$/i.test(signature)) throw new Error('Missing or malformed webhook signature');\nconst expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex');\nif (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {\n  throw new Error('Webhook authentication failed: HMAC mismatch');\n}\nconst payload = JSON.parse(raw);\nif (!payload.eventId || !payload.eventType || !payload.requestId || !payload.recipientLabel) throw new Error('Invalid notification event');\nreturn [{ json: { eventId: String(payload.eventId), eventType: String(payload.eventType), toolName: String(payload.toolName || 'Tool'), recipientLabel: String(payload.recipientLabel), requestStatus: String(payload.requestStatus || '') } }];"
+      }
+    },
+    {
+      "id": "mock",
+      "name": "Mock notification (execution log)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n// Mock delivery deliberately logs no email, phone, user ID, loan dates, or auth tokens.\nconsole.log('[LendLoop mock notification]', JSON.stringify({ eventId: item.eventId, type: item.eventType, to: item.recipientLabel, tool: item.toolName }));\nreturn [{ json: { ok: true, eventId: item.eventId } }];"
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Acknowledge verified event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        950,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.ok, eventId: $json.eventId }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Signed Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify timestamp & HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify timestamp & HMAC": {
+      "main": [
+        [
+          {
+            "node": "Mock notification (execution log)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock notification (execution log)": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge verified event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}

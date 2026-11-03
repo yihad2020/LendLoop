@@ -1,0 +1,22 @@
+name: Policy and workflow checks
+on:
+  push:
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate workflow JSON and secret hygiene
+        run: |
+          python3 -m json.tool n8n/workflows/01-request-notifications.json > /dev/null
+          python3 -m json.tool n8n/workflows/02-overdue-reminders.json > /dev/null
+          python3 -m json.tool n8n/workflows/03-error-handler.json > /dev/null
+          ! grep -RE '(sk_live_[A-Za-z0-9]{12}|sk_test_[A-Za-z0-9]{12})' --exclude='.env.example' .
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run policy tests
+        run: npm test

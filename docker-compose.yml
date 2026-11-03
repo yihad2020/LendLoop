@@ -1,0 +1,24 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.46.4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY}
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      # Only for isolated, trusted local n8n. In production prefer managed credentials.
+      # On external task runners, configure the same crypto allowlist there instead.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      LENDLOOP_WEBHOOK_SECRET: ${LENDLOOP_WEBHOOK_SECRET:?Set LENDLOOP_WEBHOOK_SECRET}
+      LENDLOOP_CALLBACK_TOKEN: ${LENDLOOP_CALLBACK_TOKEN:?Set LENDLOOP_CALLBACK_TOKEN}
+      LENDLOOP_CONVEX_SITE_URL: ${LENDLOOP_CONVEX_SITE_URL:?Set LENDLOOP_CONVEX_SITE_URL}
+      GENERIC_TIMEZONE: Etc/UTC
+      TZ: Etc/UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+volumes:
+  n8n_data:
