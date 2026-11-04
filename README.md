@@ -1,10 +1,10 @@
 # LendLoop
 
-A responsive neighborhood tool-sharing board.Visitors can see currently available tool names/categories. Signed-in neighbors can list tools, request loans, approve or decline incoming requests, and confirm returns. Admins can moderate listings, review all loans, and designate trusted lenders. Two n8n workflows handle signed request notifications and daily overdue reminders, backed by a separate failure workflow.
+A responsive neighborhood tool-sharing board. Visitors can see currently available tool names/categories. Signed-in neighbors can list tools, request loans, approve or decline incoming requests, and confirm returns. Admins can moderate listings, review all loans, and designate trusted lenders. Two n8n workflows handle signed request notifications and daily overdue reminders, backed by a separate failure workflow.
 
 **Stack:** Next.js 16 App Router · React 19 · TypeScript · Clerk · Convex · n8n · Docker Compose · Web Crypto HMAC-SHA256.
 
-> **Deployment status:** Source project and exported n8n workflows. This repository does **not** include an initialized Clerk tenant, Convex deployment, n8n instance, real notification provider, or production URL. Follow setup below using your own credentials. Do not claim that unconfigured workflows have been run end-to-end.
+> **Project status (November 4, 2026):** The Clerk/Convex development app has been configured and the two-user listing, request, approval, and return flows have been manually exercised. n8n was installed and its three workflow exports imported; live request delivery, overdue callbacks, and error handling still require recorded execution evidence. No public production deployment is claimed.
 
 ## Screens / views
 
@@ -112,6 +112,8 @@ The CLI creates `convex/_generated/` with schema-aware type definitions after yo
 
 ## Testing
 
+For local secret-safe configuration checks, run `npm run preflight`. This only validates locally stored values, workflow JSON, and deployment linkage; it does not validate credentials against external services. Never paste `.env` / `.env.local` contents or n8n execution authentication headers into issues or messages.
+
 ```bash
 npm run test
 # once Clerk/Convex are initialized and generated references are ready:
@@ -119,7 +121,7 @@ npm run typecheck
 npm run build
 ```
 
-The standalone policy tests verify listing ownership, status transitions, overlapping date ranges, invalid dates, and deterministic reminder keys. End-to-end tests require initialized Clerk, Convex and n8n accounts and must be run against your configured instances.
+The standalone policy tests verify listing ownership, status transitions, overlapping date ranges, invalid dates, and deterministic reminder keys. Seven standalone tests passed locally on November 4, 2026. The two-account lending lifecycle was also reported as tested in the configured development environment. Automated n8n integration and build/typecheck outcomes must be recorded separately; unit-test success is not proof of a working production integration.
 
 **Manual acceptance checklist:**
 
@@ -142,19 +144,19 @@ The standalone policy tests verify listing ownership, status transitions, overla
 - Add rate limiting / abuse prevention, pagination, input sanitization and moderation, durable retries, backups, secret rotation, IAM/RBAC for operations, and automated security/dependency scans.
 - Implement an opt-in email/notification preferences model, retention/deletion policies, incident response, and privacy review before introducing any medical or other sensitive data.
 
-## Publish to GitHub
+## Delivery and integration verification
 
-Create an **empty public** repository named `LendLoop` under your GitHub account, without generating a README or `.gitignore`, then push this directory:
+The source is available at https://github.com/yihad2020/LendLoop.
 
-```bash
-git init -b main
-git add .
-git commit -m "Build LendLoop secure lending board and n8n workflows"
-git remote add origin https://github.com/<YOUR_USERNAME>/LendLoop.git
-git push -u origin main
-```
+Before submitting the assignment, verify and record these results (do not mark them passed without evidence):
 
-Publish only after verifying that local `.env`, `.env.local`, and other secrets are ignored (`git status --ignored`). When deployment credentials are configured, run the manual acceptance checklist above before submitting the take-home.
+1. Create a new borrow request with the n8n notification workflow **published** and the HTTPS tunnel/gateway running. Confirm the n8n execution succeeds and the matching `automationEvents` row becomes `sent` in Convex.
+2. Run the overdue workflow manually. It should call `/automation/overdue` using the bearer token. For a true write-back test, create an overdue approved loan **only in the development database** (e.g., adjust the end date of a test loan in the Convex dev dashboard). Confirm `/automation/reminders` returns `{ "recorded": true, "duplicate": false }`. Repeating the signed write-back should return `duplicate: true` without creating a second event.
+3. Verify failures are visible in n8n Executions and that the dedicated error workflow is selected for the two primary workflows.
+4. Run `npm test`, `npm run typecheck`, and `npm run build` locally after `npx convex dev` has generated its code. Capture exact results and fix any failures.
+5. Verify `git status` shows no secrets tracked, and update this document with observed outcomes, not anticipated ones.
+
+The local Cloudflare Quick Tunnel is temporary. Its hostname changes when restarted; it is not a permanent deployed automation service. The application has no public production URL yet.
 
 ## Reference documentation
 
