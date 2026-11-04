@@ -10,6 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
       - name: Validate workflow JSON and secret hygiene
         run: |
           python3 -m json.tool n8n/workflows/01-request-notifications.json > /dev/null
@@ -17,6 +18,18 @@ jobs:
           python3 -m json.tool n8n/workflows/03-error-handler.json > /dev/null
           ! grep -RE '(sk_live_[A-Za-z0-9]{12}|sk_test_[A-Za-z0-9]{12})' --exclude='.env.example' .
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run policy tests
         run: npm test
+      - name: Type-check application and Convex functions
+        run: npm run typecheck
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build production bundle
+        env:
+          # Non-secret, syntactically valid CI placeholders. Runtime credentials
+          # are supplied only by the deployment environment.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2ktcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA
+          CLERK_SECRET_KEY: sk_test_ci_placeholder_not_a_secret
+          NEXT_PUBLIC_CONVEX_URL: https://ci-placeholder.convex.cloud
+        run: npm run build

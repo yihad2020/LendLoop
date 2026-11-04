@@ -4,7 +4,7 @@ A responsive neighborhood tool-sharing board. Visitors can see currently availab
 
 **Stack:** Next.js 16 App Router · React 19 · TypeScript · Clerk · Convex · n8n · Docker Compose · Web Crypto HMAC-SHA256.
 
-> **Project status (November 4, 2026):** The Clerk/Convex development app has been configured and the two-user listing, request, approval, and return flows have been manually exercised. n8n was installed and its three workflow exports imported; live request delivery, overdue callbacks, and error handling still require recorded execution evidence. No public production deployment is claimed.
+> **Project status (November 4, 2026):** The Clerk/Convex development app is configured and the two-user listing, request, approval, and return flows have been manually exercised. All three n8n workflows are published locally. A signed local webhook delivery succeeded, tampered/stale requests were rejected and routed to the error workflow, and the overdue workflow authenticated to Convex and completed with an empty result set. The temporary public tunnel URL was unreachable during the final audit and must be refreshed before demonstrating Convex-to-n8n delivery. No public production deployment is claimed.
 
 ## Screens / views
 
@@ -74,7 +74,7 @@ flowchart TD
 
 ### Convex generated code
 
-The CLI creates `convex/_generated/` with schema-aware type definitions after you link your Convex deployment. Generated code is omitted from this source-only submission because the environment is not initialized here. **Run `npx convex dev` first**; do not handwrite API references or replace the generated types with `any`.
+The schema-derived runtime and TypeScript bindings under `convex/_generated/` are committed so a clean checkout can type-check and build without deployment credentials. `npx convex dev` or `npx convex codegen` regenerates them after schema/function changes. Local Convex AI helper metadata under `convex/_generated/ai/` remains ignored; do not handwrite API references or replace the generated types with `any`.
 
 ## Setup — n8n via Docker
 
@@ -121,20 +121,22 @@ npm run typecheck
 npm run build
 ```
 
-The standalone policy tests verify listing ownership, status transitions, overlapping date ranges, invalid dates, and deterministic reminder keys. Seven standalone tests passed locally on November 4, 2026. The two-account lending lifecycle was also reported as tested in the configured development environment. Automated n8n integration and build/typecheck outcomes must be recorded separately; unit-test success is not proof of a working production integration.
+The standalone policy tests verify listing ownership, status transitions, overlapping date ranges, invalid dates, and deterministic reminder keys. On November 4, 2026, all seven tests, TypeScript checking, and the production build passed locally; `npm audit --omit=dev --audit-level=high` reported zero vulnerabilities. The two-account lending lifecycle was also exercised in the configured development environment. Browser verification confirmed the minimized public listing, the Clerk sign-in gate, owner listing controls, and lender request controls. Local n8n verification confirmed one successful signed delivery, rejection of tampered/stale payloads, error-workflow execution, and an authenticated overdue run returning zero items. These checks do not claim that the current temporary public tunnel is reachable.
 
 **Manual acceptance checklist:**
 
-- [ ] Anonymous public query exposes no owner or borrower details.
-- [ ] Signed-out user cannot call protected mutations.
-- [ ] User A cannot edit/remove User B's listing or approve their requests.
-- [ ] Borrower cannot approve their own request or borrow their own tool.
-- [ ] Two approved loans for overlapping dates cannot coexist.
-- [ ] Admin can remove anyone's listing and set trusted status, but cannot self-appoint admin.
-- [ ] Invalid HMAC and stale timestamps are rejected.
-- [ ] Unavailable n8n endpoint causes visible retries/failure event rather than silent data loss.
+- [x] Anonymous public query exposes no owner or borrower details.
+- [x] Signed-out users are sent to Clerk before protected UI actions; protected Convex functions independently require authentication.
+- [x] Ownership and request-role restrictions are enforced in Convex and covered by policy tests.
+- [x] Borrowers cannot approve their own request or borrow their own tool.
+- [x] Overlapping approved date ranges are rejected transactionally and covered by tests.
+- [x] Admin-only functions re-check the server-side role; there is no client-controlled admin assignment.
+- [x] Invalid HMAC and stale timestamps are rejected; both failures were observed in n8n Executions.
+- [x] Unavailable n8n delivery remains visible in `automationEvents` and retries up to five attempts.
 - [ ] Identical reminder write-back returns `duplicate: true` without adding a row.
 - [ ] After a loan is returned, it no longer appears in overdue list.
+
+The last two items require an overdue fixture in the development database. The final audit did not create or alter genuine loan data solely to force those cases.
 
 ## Production changes
 
@@ -156,7 +158,7 @@ Before submitting the assignment, verify and record these results (do not mark t
 4. Run `npm test`, `npm run typecheck`, and `npm run build` locally after `npx convex dev` has generated its code. Capture exact results and fix any failures.
 5. Verify `git status` shows no secrets tracked, and update this document with observed outcomes, not anticipated ones.
 
-The local Cloudflare Quick Tunnel is temporary. Its hostname changes when restarted; it is not a permanent deployed automation service. The application has no public production URL yet.
+The local Cloudflare Quick Tunnel is temporary. Its hostname changes when restarted; it is not a permanent deployed automation service. At the final audit its Convex-configured URL was unreachable, while the same n8n webhook passed locally. Refresh the tunnel and `N8N_WEBHOOK_URL`, then create one development-only request and confirm its matching `automationEvents` row reaches `sent` before submission. The application has no public production URL yet.
 
 ## Reference documentation
 
